@@ -27,6 +27,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     string public constant name = "Origin";
     string public constant symbol = "XBO";
     uint8 public constant decimals = 18;
+    bool public voteOpen = false;
 
     address private foundationAddress = 0x0; //onlyOwner set. Address of the Origin Foundation
     address private ownerAddress; //owner of the contract
@@ -60,28 +61,17 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     uint256 private totalFoundationDailyClaim = maxFoundationTotalDailyClaim; //onlyOwner set
     uint256 private maxFoundationIndividualDailyClaim = btcPeggedPrice.mul(100).div(xboPeggedPrice).div(2); //Calculated as 1 BTC at $7427 and 1 XBO at $0.05 equals 148,540 XBO and max cap of 0.5 BTC
 
-    bool public voteOpen = false;
-    uint256 private totalVotes = 0;
-
     uint256 private blockVoterDistribution = dailyVoterDistribution.div(blocksInADay);
 
-    // 365/12 = 30.42 days in a regular year and 366/12 = 30.50 days in a leap year
-    //blocksInAMonth = 30.42 ∗ blocksInADay = 202171,32
-    //uint256 private blocksInAMonth = blocksInADay.mul(daysInYear.div(12));
-    //monthlyAmbassadorRewards = 30.42 ∗ dailyAmbassadorRewards = 22,919,178.15
-    //uint256 private monthlyAmbassadorRewards = dailyAmbassadorRewards.mul(daysInYear.div(12));
-
     uint256 private currentBlock = block.number;
+    uint256 private totalVotes = 0;
 
     uint256 private currentTotalStakeIndex = 0;
 
-
     uint256[] private ambassadorMonthlyRewardsByPosition; //onlyOwner set
-
-    address[] private candidateListAddresses;
+    address[] private candidateListAddresses;  //onlyOwner set
     address[] private votersAddresses;
     CurrentTotalStakesStruct[] private stakeHistory;
-
 
     mapping(address => ClaimStruct) private userClaimedBalances;
 
@@ -141,10 +131,9 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * Constrctor function
+     * @dev Constrctor function
      *
      * Initializes token and sets the owner
-     *
      * Initialises the ambassadorMonthlyRewardsByPosition
      */
     constructor() public {
@@ -173,9 +162,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * onlyOwner validates
+     * @dev onlyOwner validates that the incoming sender === owner
      *
-     * that the incoming sender === owner
      */
     modifier onlyOwner() {
         require(msg.sender == ownerAddress);
@@ -183,9 +171,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * ownerOrFoundation validates
+     * @dev ownerOrFoundation validates that the incoming sender === owner
      *
-     * that the incoming sender === owner
      */
     /*modifier ownerOrFoundation() {
         require(msg.sender == ownerAddress || msg.sender == foundationAddress);
@@ -193,18 +180,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }*/
 
     /**
-     * canClaim validates:
+     * @dev canClaim validates that canClaim == true and (claimableBalance > 0, current Users's remainingDailyBalance > 0) or (blockNumber > previous claimed block) and (remainingDailyBalance > 0 or we are on a new day)
      *
-     * canClaim == true
-     *
-     * claimableBalance > 0
-     * remainingDailyBalance > 0
-     * or
-     * blockNumber > previous Claimed Block Number for the user + Blocks in a day
-     *
-     * contract remaining daily claim > 0
-     * or
-     * blok numbwe > contract claim block + blocks in a day
      */
     modifier canClaim() {
         require (userClaimedBalances[msg.sender].canClaim == true &&
@@ -214,7 +191,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * canClaimFoundation validates:
+     * @dev canClaimFoundation validates:
      *
      * canClaim == true
      * remainingDailyBalance > 0
@@ -232,9 +209,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }*/
 
     /**
-     * onlyFoundation validates
+     * @dev onlyFoundation validates that the incoming address is the Origin Foundation's adddress
      *
-     * that the incoming address is the Origin Foundation's adddress
      */
     modifier onlyFoundation() {
         require(msg.sender == foundationAddress);
@@ -242,9 +218,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * canStartStaking validates
+     * @dev canStartStaking validates that the address has balance to stake
      *
-     * that the address has balance to stake
      */
     modifier canStartStaking {
         require (balances[msg.sender] >= msg.value);
@@ -252,9 +227,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * canStopStaking validates
+     * @dev canStopStaking validates that the address has staked amount
      *
-     * that the address has staked amount
      */
     modifier canStopStaking {
         require (stakes[msg.sender] >= msg.value);
@@ -263,9 +237,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * canVote validates
+     * @dev canVote validates that the addres has not voted and the voting process is open
      *
-     * that the addres has voted
      */
     modifier canVote() {
         require(voteOpen == true && voters[msg.sender].voted == false);
@@ -273,9 +246,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * isOpen validates
+     * @dev isOpen validates that voting process is open
      *
-     * that voting process is open
      */
     modifier isOpen() {
         require(voteOpen == true);
@@ -283,9 +255,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * isClosed validates
+     * @dev isClosed validates that voting process is closed
      *
-     * that voting process is closed
      */
     modifier isClosed() {
         require(voteOpen == false);
@@ -339,11 +310,19 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         totalFoundationDailyClaim = _totalFoundationDailyClaim;
     }*/
 
-    // returns foundationAddress
+    /**
+     * @dev returns the foundationAddress
+     *
+     */
     function getFoundationAddress() public view returns(address) {
         return foundationAddress;
     }
-    // set the foundationAddress to _foundationAddress
+
+    /**
+     * @dev set the foundationAddress to _foundationAddress
+     *
+     * @param address _foundationAddress
+     */
     function setFoundationAddress(address _foundationAddress) public onlyOwner {
         foundationAddress = _foundationAddress;
     }
@@ -412,6 +391,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     function getClaimableBalance(address _claimAddress) public view returns(uint256) {
         return userClaimedBalances[_claimAddress].claimableBalance;
     }
+
     /**
      * @dev sets the claimableBalance at address claimAddress to claimableBalance
      *
@@ -429,7 +409,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * @param: address _claimAddress (the address who will be claiming the token)
      * @param: uint256 _claimableBalance (the total amount that the address can claim)
      *
-     * TODO: Figure out a way to make the address claimableBalance additive, not fixed.
+     * TODO: Figure out a way to make the address claimableBalance
      */
     function createNewClaimer(address _claimAddress, uint256 _claimableBalance) public onlyOwner {
         userClaimedBalances[_claimAddress] = ClaimStruct({
@@ -441,53 +421,35 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         });
     }
 
+    /**
+     * @dev returns the candidateList at index _index
+     *
+     * @param: uint256 _index
+     *
+     * @returns string name, string surname string metadata, uint256 votes of the candidate
+     */
     function getCandidateList(uint256 _index) public view returns(string name, string surname, string metadata, uint256 votes) {
         require(candidateListAddresses.length > _index);
-        // copy the data into memory
-        CandidateStruct memory c = candidateList[candidateListAddresses[_index]];
 
-        // break the struct's members out into a tuple
-        // in the same order that they appear in the struct
+        CandidateStruct memory c = candidateList[candidateListAddresses[_index]];
         return (c.name, c.surname, c.metadata, c.votes);
     }
 
+    /**
+     * @dev returns the ambssadorList at index _index
+     *
+     * @param: uint256 _index
+     *
+     * @returns string address ambassadorAddressm uint256 blockStarted, uint256 totalVotes, uint256, rank of the ambsasador
+     */
     function getAmbassadorList(uint256 _index) public view returns(address ambassadorAddress, uint256 blockStarted, uint256 totalVotes, uint256 rank) {
-        // copy the data into memory
         AmbassadorStuct memory a = ambassadorList[_index];
 
-        // break the struct's members out into a tuple
-        // in the same order that they appear in the struct
         return (a.ambassadorAddress, a.blockStarted, a.totalVotes, a.rank);
     }
 
-
-    /** FEATURE 1: CLAIMING:
-     *
-     * Claiming allows user to claim XBO tokens on a daily basis.
-     * Claimers have to fetch their tokens, tokens will not be automatically airdropped to users
-     * Claimers can fetch up to a maximum of their USD (fixed at fork date) value of BTC, ETH, BCH, LTC, and DASH (set in userClaimedBalances[address].claimableBalance)
-     *
-     * To illustrate, if a user has 1 of each BTC, ETH, BCH, LTC, and DASH at current value it would be;
-     * 1 x BTC ($7427) + 1 x ETH ($587) + 1 x BCH ($1070) + 1 x LTC ($117) + 1 x DASH ($311)
-     * $9512 / $0.05 (expected trade value of XBO)
-     * 190,240 XBO
-     * So the maximum amount of tokens claimable will be 190,240.
-     *
-     * Claimers can fetch up to a daily maximum of x, where x is assumed to be an XBO value equivalent to 0.5
-     * BTC, and x being configurable by OnlyOwner.
-     * 1 BTC = 190,240 XBO, so 0.5 would be 74,270
-     *
-     * At maximum claim ratio this would allow for;
-     * 295 people @ 0.5 BTC max that can claim
-     *
-     * Claimers will need to register for an Origin wallet. This wallet will be a web interface. After they have logged
-     * in they will be able to claim tokens. This will require ETH in their wallet to initiate the claim process.
-     *
-     */
-
-
     /**
-     * @param: claim XBO tokens daily
+     * @dev claim XBO tokens daily
      *
      * checks whether the clalimer is the Origin foundation address or not
      * checks the total claimed amount for the contract
@@ -568,21 +530,12 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
     }
 
-
-    /** FEATURE 2: STAKING
+    /**
+     * @dev calculates the staking reward for the address based on staked amount relative to total staked amount and staked period
      *
-     * Staking allows user to stake their active funds. This will move funds from their current balances = address
-     * => uint256 to the staking balance stakes = address => uint256.
-     *
-     * Staking will not mint net tokens unless actively withdrawn or staking more tokens.
-     * Stake will be added to the balances pool, not the staked pool.
-     * Stake is not passively distributed.
-     * Stake needs to be actively withdrawn by the user.
-     *
-     *
-     *
+     * returns uint256 stakeReward
      */
-    /*function calculateReward() internal view returns(uint256) {
+    function calculateReward() internal view returns(uint256) {
         if(userStakeHistory[msg.sender].length == 0 || stakeHistory.length == 0) {
             return 0;
         }
@@ -623,7 +576,11 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }*/
 
     /**
-     * stakes a portion of the tokens for an address
+     * @dev stakes a portion of the tokens for an address
+     *
+     * @param uint256 _amount the amount to be staked
+     *
+     * validates if the address can stake the amount (balance >= stake)
      *
      * every time that an address startsStaking, we mint the tokens for the staking rewards.
      * increment the current user's stake
@@ -670,7 +627,11 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * stops staking a portion of the tokens for an address
+     * @dev stops staking a portion of the tokens for an address
+     *
+     * @param uint256 _amount the amount to be unstaked
+     *
+     * validates if the address can stop staking the amount (stake >= balance)
      *
      * every time that an address stopsStaking, we mint the tokens for the staking rewards.
      * subtract from the current user's stake
@@ -716,17 +677,15 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }));
     }
 
-
-    /** FEATURE 3: VOTING
+    /**
+     * @dev add a candidate to the candidateList
      *
-     * Voting is designed to allow XBO holders to vote on a monthly* basis. Voters will receive rewards for
-     * their votes. Voters can vote for candidates from the pre-configured candidates list. Voters vote in ambassadors
-     *
-     * Users vote equals their staked balance on a 1:1 ratio
+     * @param address _address the address of the candidate
+     * @param string _name the name of the candidate
+     * @param string _surname the surname of the candidate
+     * @param string _metadata the metadata of the candidate (youtuber, influencer, journalist, nodeRunner etc.)
      *
      */
-
-    //Do this one at a time. Most likely.
     function addToCandidateList(address _address, string _name, string _surname, string _metadata) public onlyOwner {
         candidateList[_address] = CandidateStruct({
             name: _name,
@@ -756,6 +715,10 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
     }*/
 
+    /**
+    * @dev remvoes all candidates from the candidateList
+    *
+    */
     function clearCandidateList() private {
         for(uint256 i = 0; i < candidateListAddresses.length; i++) {
             delete candidateList[candidateListAddresses[i]];
@@ -764,6 +727,13 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         candidateListAddresses.length = 0;
     }
 
+    /**
+    * @dev starts the voting process
+    *
+    * Rests all existing votes in the system so that we can start a new round
+    * Clears all the existing candidates from teh candidateList so that a new one can be generated
+    *
+    */
     function startVote() public onlyOwner isClosed {
         resetVote();
         clearCandidateList();
@@ -771,6 +741,13 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         //voteOpenBlock = block.number;
     }
 
+    /**
+    * @dev ends the voting process
+    *
+    * rewards all the ambassadors for the previous month based on their position in the list.
+    * sorts the candidates in order of votes received then creates the new ambsasador list.
+    *
+    */
     function endVote() public onlyOwner isOpen {
         voteOpen = false;
         //voteCloseBlock = block.number;
@@ -794,6 +771,10 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
     }
 
+    /**
+    * @dev casts a vote for a candidate from the candidateList. Vote weighting is based on staked amount
+    *
+    */
     function castVote(address _address) public canVote {
         voters[msg.sender].voted = true;
         voters[msg.sender].votes = getStake(msg.sender);
@@ -803,19 +784,19 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         totalVotes = totalVotes.add(getStake(msg.sender));
     }
 
+
+    /**
+    * @dev returns the staked amount for an address
+    *
+    * @returns uint256 stakedAmount
+    *
+    */
     function getStake(address _address) internal view returns(uint256) {
         return stakes[_address];
     }
 
-
-    /** FEATURE 4: VOTING DISTRIBUTION
-     *
-     * Considerations
-     *
-     * Voting round reset triggers manually via Owner. Token distribution should also trigger manually along with reset.
-     *
-     * Reset vote, iterate through voters, for each voter calculate a) block when staking started and b) stake. Stake
-     * is based on total voting stake at time of reset and not stake at time of stake
+    /**
+     * @dev resets the votes for the candidates. Allowing addresses to vote in the next round of voting.
      *
      */
     function resetVote() private {
@@ -840,27 +821,14 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
 
         totalVotes = 0;
-}
+    }
 
-
-
-
-    /** FEATURE 5: AMBASSADOR
+    /**
+     * @dev Sorts the candidates in the order of their votes reveived. Most votes first.
      *
-     * Ambassadors are voted in from the candidate list. Stakers can vote for candidates.
-     *
-     * List of ethereum addresses => meta data TBC to ambassadors
-     *
-     * List of Candidates (Managed by Owner)
-     * Vote on List of Candidates (locks up stake)
-     * Define list maximum (by Owner)
-     * Voting rounds (monthly) - Reset by Owner
-     *
-     * Reset occurs - stake older than reset block are allowed to stopStaking if stake has vote active Voting stake
-     * contributed at time of vote
+     * @returns address[] the sorted array of address
      *
      */
-
     function sortCandidates(address[] _array) internal view returns(address[]) {
         for(uint256 i = 0; i < _array.length; i++) {
             for(uint256 j = 0; j < i; j++) {
@@ -873,18 +841,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
         return _array;
     }
-
-    /** FEATURE 6: AMBASSADOR REWARDS
-     *
-     *
-     * Ambassador Reward Scheme
-     *
-     * 1. 20%
-     * 2. 15%
-     * 3. 10%
-     * ...
-     *
-     */
 
     /*function rewardAmbassadors() private onlyOwner {
         for(uint256 i = 0; i < ambassadorMonthlyRewardsByPosition.length; i++) {
