@@ -33,66 +33,61 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
 
     uint256 private daysInYear = 365; //number of days in a year
     uint256 private blocksInADay = 6646; // Calculated as 1 block = 13 seconds, 24 (hours) * 60 (minutes) * 60 (seconds) / 13 (13 seconds per block)
-    uint256 private yearsUntilFullyDiluted = 2; //number of years until blockRewardSupply is depleted
+    //uint256 private yearsUntilFullyDiluted = 2; //number of years until blockRewardSupply is depleted
     uint256 private forkedCoinSupply = 16000000000; //Forked coin supply
     uint256 private blockRewardSupply = 11000000000; //Block reward supply
 
-    uint256 private btcPeggedPrice = 6301; //pegged on 2018/07/02 07:18 GMT+2
+    uint256 private btcPeggedPrice = 6300; //pegged on 2018/07/02 07:18 GMT+2
     uint256 private xboPeggedPrice = 5; //self pegged. NOTE** Divide by 100
     uint256 private maxAmbassadors = 20; // OnlyOwner configurable
     uint256 private ambassadorBlockRewardPercent = 5; //Rewards for Ambassador on sliding scale of 5% of total diluted per day
     uint256 private votingStakeRewardPercent = 25; //Proportionate to voting stake per day of 25% of total diluted per day
     uint256 private stakingRewardPercent = 70; //Proportionate distribution to stakers per day of 70% of total diluted per day
 
-    uint256 private dilutionPerDay = blockRewardSupply.div(daysInYear.mul(yearsUntilFullyDiluted)); // Calculated as BlockRewardSupply 11,000,000,000 / (days in year (365) * years till fully diluted (2) )
+    uint256 private dilutionPerDay = blockRewardSupply.div(daysInYear.mul(2)); // Calculated as BlockRewardSupply 11,000,000,000 / (days in year (365) * years till fully diluted (2) )
     uint256 private dailyAmbassadorRewards = dilutionPerDay.mul(ambassadorBlockRewardPercent).div(100); // Calculated as dilution per day * block reward for ambassadors (5%)
     uint256 private perBlockAmbassadorRewards = dailyAmbassadorRewards.div(blocksInADay); //perBlockAmbassadorRewards = dailyAmbassadorRewards / blocksInADay
+    uint256 private dailyStakingRewards = dilutionPerDay.mul(stakingRewardPercent).div(100); // Calculated as dilution per day * block reward for ambassadors (5%)
 
-    uint256 private maxTotalDailyClaim = forkedCoinSupply.div(daysInYear.mul(yearsUntilFullyDiluted)); // Calculated Forked Coins Supply 16,000,000,000 / days in year (365) * years till fully diluted (2)
-    uint256 private maxIndividualDailyClaim = btcPeggedPrice.div(xboPeggedPrice.div(100)).div(2); // Calculated as 1 BTC at $7427 and 1 XBO at $0.05 equals 148,540 XBO and max cap of 0.5 BTC
+    uint256 private maxTotalDailyClaim = forkedCoinSupply.div(daysInYear.mul(2)); // Calculated Forked Coins Supply 16,000,000,000 / days in year (365) * years till fully diluted (2)
+    uint256 private maxIndividualDailyClaim = btcPeggedPrice.mul(100).div(xboPeggedPrice).div(2); // Calculated as 1 BTC at $7427 and 1 XBO at $0.05 equals 148,540 XBO and max cap of 0.5 BTC
     uint256 private totalDailyClaimHitZeroBlock = 0; //onlyOwner set
     uint256 private totalDailyClaim = maxTotalDailyClaim; //onlyOwner set
     uint256 private dailyVoterDistribution = 753424; //TODO: Figure out calculation for this
 
-    uint256 private maxFoundationTotalDailyClaim = forkedCoinSupply.div(daysInYear.mul(yearsUntilFullyDiluted)); // Calculated Forked Coins Supply 16,000,000,000 / days in year (365) * years till fully diluted (2)
+    uint256 private maxFoundationTotalDailyClaim = forkedCoinSupply.div(daysInYear.mul(2)); // Calculated Forked Coins Supply 16,000,000,000 / days in year (365) * years till fully diluted (2)
     uint256 private totalFoundationDailyClaimHitZeroBlock = 0; //onlyOwner set
     uint256 private totalFoundationDailyClaim = maxFoundationTotalDailyClaim; //onlyOwner set
-    uint256 private maxFoundationIndividualDailyClaim = btcPeggedPrice.div(xboPeggedPrice.div(100)).div(2); //Calculated as 1 BTC at $7427 and 1 XBO at $0.05 equals 148,540 XBO and max cap of 0.5 BTC
+    uint256 private maxFoundationIndividualDailyClaim = btcPeggedPrice.mul(100).div(xboPeggedPrice).div(2); //Calculated as 1 BTC at $7427 and 1 XBO at $0.05 equals 148,540 XBO and max cap of 0.5 BTC
 
-    bool voteOpen = false;
-    uint256 voteOpenBlock = 0;
-    uint256 voteCloseBlock = 0;
-    uint256 totalVotes = 0;
+    bool private voteOpen = false;
+    //uint256 voteOpenBlock = 0;
+    //uint256 voteCloseBlock = 0;
+    uint256 private totalVotes = 0;
 
-    uint256 blockVoterDistribution = dailyVoterDistribution.div(blocksInADay);
-
-    /* figure out what to do with these
-        VoteClose;
-        VoteOpen;
-        VoteReset;
-    */
+    uint256 private blockVoterDistribution = dailyVoterDistribution.div(blocksInADay);
 
     // 365/12 = 30.42 days in a regular year and 366/12 = 30.50 days in a leap year
     //blocksInAMonth = 30.42 ∗ blocksInADay = 202171,32
-    uint256 blocksInAMonth = blocksInADay.mul(daysInYear.div(12));
+    //uint256 private blocksInAMonth = blocksInADay.mul(daysInYear.div(12));
     //monthlyAmbassadorRewards = 30.42 ∗ dailyAmbassadorRewards = 22,919,178.15
-    uint256 monthlyAmbassadorRewards = dailyAmbassadorRewards.mul(daysInYear.div(12));
+    //uint256 private monthlyAmbassadorRewards = dailyAmbassadorRewards.mul(daysInYear.div(12));
 
-    //(totalStakeIndex, totalStakeBlock, totalStake) = getTotalStakeHistoryCurrent(); /* 0, 0, 0 */
-    //(userStake, userBlock) = getUserStakeHistoryCurrent(); /* 100, 0 */
-    uint256 currentBlock = block.number; /* 0 */
+    uint256 private currentBlock = block.number; /* 0 */
 
-    uint256 stakeReward = 0;
+    //uint256 private stakeReward = 0;
 
-    uint256 currentTotalStake = 0;
-    uint256 currentTotalStakeIndex = 0;
-    uint256 currentTotalStakeBlock = 0;
+    //uint256 private currentTotalStake = 0; rather use built in stakedSupply_ from StakedToken.sol
+    //uint256 private currentTotalStakeBlock = 0;
+    uint256 private currentTotalStakeIndex = 0;
 
 
     uint256[] private ambassadorMonthlyRewardsByPosition; //onlyOwner set
 
     address[] private candidateListAddresses;
     address[] private votersAddresses;
+    CurrentTotalStakesStruct[] private stakeHistory;
+
 
     mapping(address => ClaimStruct) private userClaimedBalances;
 
@@ -103,8 +98,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     mapping(uint256 => AmbassadorStuct) private ambassadorList;
 
     mapping(address => CurrentUserStakesStruct) private currentUserStakes;
-    mapping(uint256 => CurrentTotalStakesStruct) private stakeHistory;
-    mapping(address => UserStakeHistory) private userStakeHistory;
+    mapping(address => UserStakeHistory[]) private userStakeHistory;
 
     struct ClaimStruct {
         bool canClaim;
@@ -136,9 +130,9 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     struct UserStakeHistory {
+        uint256 totalStakeIndex;
         uint256 userStake;
         uint256 userStakeBlock;
-        uint256 totalStakeIndex;
     }
 
     struct CurrentUserStakesStruct {
@@ -163,26 +157,26 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     constructor() public {
         ownerAddress = msg.sender;
 
-        ambassadorMonthlyRewardsByPosition[1] = 20;
-        ambassadorMonthlyRewardsByPosition[2] = 15;
-        ambassadorMonthlyRewardsByPosition[3] = 10;
-        ambassadorMonthlyRewardsByPosition[4] = 8;
-        ambassadorMonthlyRewardsByPosition[5] = 8;
-        ambassadorMonthlyRewardsByPosition[6] = 8;
-        ambassadorMonthlyRewardsByPosition[7] = 5;
-        ambassadorMonthlyRewardsByPosition[8] = 5;
-        ambassadorMonthlyRewardsByPosition[9] = 5;
-        ambassadorMonthlyRewardsByPosition[10] = 2;
-        ambassadorMonthlyRewardsByPosition[11] = 2;
-        ambassadorMonthlyRewardsByPosition[12] = 2;
-        ambassadorMonthlyRewardsByPosition[13] = 2;
-        ambassadorMonthlyRewardsByPosition[14] = 2;
-        ambassadorMonthlyRewardsByPosition[15] = 1;
-        ambassadorMonthlyRewardsByPosition[16] = 1;
-        ambassadorMonthlyRewardsByPosition[17] = 1;
-        ambassadorMonthlyRewardsByPosition[18] = 1;
-        ambassadorMonthlyRewardsByPosition[19] = 1;
-        ambassadorMonthlyRewardsByPosition[20] = 1;
+        ambassadorMonthlyRewardsByPosition.push(0);
+        ambassadorMonthlyRewardsByPosition.push(20);
+        ambassadorMonthlyRewardsByPosition.push(15);
+        ambassadorMonthlyRewardsByPosition.push(10);
+        ambassadorMonthlyRewardsByPosition.push(8);
+        ambassadorMonthlyRewardsByPosition.push(8);
+        ambassadorMonthlyRewardsByPosition.push(8);
+        ambassadorMonthlyRewardsByPosition.push(5);
+        ambassadorMonthlyRewardsByPosition.push(5);
+        ambassadorMonthlyRewardsByPosition.push(5);
+        ambassadorMonthlyRewardsByPosition.push(2);
+        ambassadorMonthlyRewardsByPosition.push(2);
+        ambassadorMonthlyRewardsByPosition.push(2);
+        ambassadorMonthlyRewardsByPosition.push(2);
+        ambassadorMonthlyRewardsByPosition.push(2);
+        ambassadorMonthlyRewardsByPosition.push(1);
+        ambassadorMonthlyRewardsByPosition.push(1);
+        ambassadorMonthlyRewardsByPosition.push(1);
+        ambassadorMonthlyRewardsByPosition.push(1);
+        ambassadorMonthlyRewardsByPosition.push(1);
     }
 
     /**
@@ -191,7 +185,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * that the incoming sender === owner
      */
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == ownerAddress);
         _;
     }
 
@@ -200,26 +194,29 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      *
      * that the incoming sender === owner
      */
-    modifier ownerOrFoundation() {
+    /*modifier ownerOrFoundation() {
         require(msg.sender == ownerAddress || msg.sender == foundationAddress);
         _;
-    }
+    }*/
 
     /**
      * canClaim validates:
      *
      * canClaim == true
-     * remainingDailyBalance > 0
-     * claimableBalance > 0
      *
+     * claimableBalance > 0
+     * remainingDailyBalance > 0
+     * or
+     * blockNumber > previous Claimed Block Number for the user + Blocks in a day
+     *
+     * contract remaining daily claim > 0
+     * or
+     * blok numbwe > contract claim block + blocks in a day
      */
     modifier canClaim() {
         require (userClaimedBalances[msg.sender].canClaim == true &&
-        ((userClaimedBalances[msg.sender].remainingDailyBalance > 0 &&
-        userClaimedBalances[msg.sender].claimableBalance > 0) ||
-        userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) >= block.number) &&
-        (totalDailyClaim > 0 ||
-        totalDailyClaimHitZeroBlock.add(blocksInADay) >= block.number));
+        ((userClaimedBalances[msg.sender].remainingDailyBalance > 0 || userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) <= block.number) && userClaimedBalances[msg.sender].claimableBalance > 0) &&
+        (totalDailyClaim > 0 || totalDailyClaimHitZeroBlock.add(blocksInADay) <= block.number));
         _;
     }
 
@@ -231,7 +228,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * claimableBalance > 0
      *
      */
-    modifier canClaimFoundation() {
+    /*modifier canClaimFoundation() {
         require (userClaimedBalances[msg.sender].canClaim == true &&
         ((userClaimedBalances[msg.sender].remainingDailyBalance > 0 &&
         userClaimedBalances[msg.sender].claimableBalance > 0) ||
@@ -239,7 +236,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         (totalFoundationDailyClaim > 0 ||
         totalFoundationDailyClaimHitZeroBlock.add(blocksInADay) >= block.number));
         _;
-    }
+    }*/
 
     /**
      * onlyFoundation validates
@@ -304,7 +301,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
 
     //GETTERS AND SETTERS
 
-    // returns ambassadorMonthlyRewardsByPosition at index position
+    /*// returns ambassadorMonthlyRewardsByPosition at index position
     function getAmbassadorMonthlyRewardsByPosition(uint256 _position) public view returns(uint256) {
         return ambassadorMonthlyRewardsByPosition[_position];
     }
@@ -347,18 +344,18 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     // set the totalFoundationDailyClaim to _totalFoundationDailyClaim
     function setTotalFoundationDailyClaim(uint256 _totalFoundationDailyClaim) public onlyOwner {
         totalFoundationDailyClaim = _totalFoundationDailyClaim;
-    }
+    }*/
 
     // returns foundationAddress
     function getFoundationAddress() public view returns(address) {
         return foundationAddress;
     }
     // set the foundationAddress to _foundationAddress
-    function setBTCPeggedPrice(address _foundationAddress) public onlyOwner {
+    function setFoundationAddress(address _foundationAddress) public onlyOwner {
         foundationAddress = _foundationAddress;
     }
 
-    // returns btcPeggedPrice
+    /*// returns btcPeggedPrice
     function getBTCPeggedPrice() public view returns(uint256) {
         return btcPeggedPrice;
     }
@@ -410,19 +407,19 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     // sets the stakingRewardPercent to _stakingRewardPercent
     function setStakingRewardPercent(uint256 _stakingRewardPercent) public onlyOwner {
         stakingRewardPercent = _stakingRewardPercent;
-    }
+    }*/
 
     // returns claimableBalance for address claimAddress
     function getClaimableBalance(address _claimAddress) public view returns(uint256) {
         return userClaimedBalances[_claimAddress].claimableBalance;
     }
     // sets the claimableBalance at address claimAddress to claimableBalance
-    function setClaimableBalance(address _claimAddress, uint256 _claimableBalance) public ownerOrFoundation {
+    function setClaimableBalance(address _claimAddress, uint256 _claimableBalance) public onlyOwner {
         userClaimedBalances[_claimAddress].claimableBalance = _claimableBalance;
     }
 
     // creat a new claimer address claimerAddress with claimer balance set to claimerBalance
-    function createNewClaimer(address _claimAddress, uint256 _claimableBalance) public ownerOrFoundation {
+    function createNewClaimer(address _claimAddress, uint256 _claimableBalance) public onlyOwner {
         userClaimedBalances[_claimAddress] = ClaimStruct({
             canClaim: true,
             blockNumber: 0,
@@ -430,6 +427,16 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
             totalClaimedBalance: 0,
             claimableBalance: _claimableBalance
         });
+    }
+
+    function getCandidateList(uint256 _index) public returns(string name, string surname, string metadata, uint256 votes) {
+        require(candidateListAddresses.length > _index);
+        // copy the data into memory
+        CandidateStruct memory c = candidateList[candidateListAddresses[_index]];
+
+        // break the struct's members out into a tuple
+        // in the same order that they appear in the struct
+        return (c.name, c.surname, c.metadata, c.votes);
     }
 
 
@@ -469,23 +476,35 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * apply the claimable amount to the claimer's balancae
      * mint the token
      *
+     * TODO: Merge foundation claiming feature in here? Just need to check if msg.sender == foundationAddress then use foundation limitations on claiming
      */
     function claim() public canClaim returns (bool) {
         // Reset daily user block limit on a per user basis
         if (userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) >= block.number) {
             userClaimedBalances[msg.sender].blockNumber = block.number;
-            userClaimedBalances[msg.sender].remainingDailyBalance = maxIndividualDailyClaim;
+            if(msg.sender == foundationAddress) {
+                userClaimedBalances[msg.sender].remainingDailyBalance = maxFoundationIndividualDailyClaim;
+            } else {
+                userClaimedBalances[msg.sender].remainingDailyBalance = maxIndividualDailyClaim;
+            }
         }
 
         // Reset total daily block limit for all users if true
-        if (totalDailyClaimHitZeroBlock.add(blocksInADay) >= block.number) {
-            //TODO: this might skip a couple of blocks. Would it not be better to do something along the lines of totalDailyClaimHitZeroBlock = totalDailyClaimHitZeroBlock.add(blocksInADay);
-            //      ie. always increment it by 1 day? What happens if nobody claims in a day then?
-            //          maybe uint256 days = (block.numebr-totalDailyClaimHitZeroBlock).div(blocksInADay);
-            //          if (days >= 1) { totalDailyClaimHitZeroBlock.add(blocksInADay.mul(days)); totalDailyClaim = maxTotalDailyClaim; }
-            //      same logic applies to the check above
-            totalDailyClaimHitZeroBlock = block.number;
-            totalDailyClaim = maxTotalDailyClaim;
+        if(msg.sender == foundationAddress) {
+            if (totalFoundationDailyClaimHitZeroBlock.add(blocksInADay) >= block.number) {
+                totalFoundationDailyClaimHitZeroBlock = block.number;
+                totalFoundationDailyClaim = maxFoundationTotalDailyClaim;
+            }
+        } else {
+            if (totalDailyClaimHitZeroBlock.add(blocksInADay) >= block.number) {
+                //TODO: this might skip a couple of blocks. Would it not be better to do something along the lines of totalDailyClaimHitZeroBlock = totalDailyClaimHitZeroBlock.add(blocksInADay);
+                //      ie. always increment it by 1 day? What happens if nobody claims in a day then?
+                //          maybe uint256 days = (block.numebr-totalDailyClaimHitZeroBlock).div(blocksInADay);
+                //          if (days >= 1) { totalDailyClaimHitZeroBlock.add(blocksInADay.mul(days)); totalDailyClaim = maxTotalDailyClaim; }
+                //      same logic applies to the check above
+                totalDailyClaimHitZeroBlock = block.number;
+                totalDailyClaim = maxTotalDailyClaim;
+            }
         }
 
         //Base potential claim amount calculated as claimable balance (value left over from total claimable balance) − totalClaimed so far
@@ -497,13 +516,24 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
 
         // Second limiter checks total daily limit
-        if (claimableAmount > totalDailyClaim) {
-            claimableAmount = totalDailyClaim;
+        if(msg.sender == foundationAddress) {
+            if (claimableAmount > totalFoundationDailyClaim) {
+                claimableAmount = totalFoundationDailyClaim;
+            }
+        } else {
+            if (claimableAmount > totalDailyClaim) {
+                claimableAmount = totalDailyClaim;
+            }
         }
 
         // We have a claimable amount
         if (claimableAmount > 0) {
-            totalDailyClaim = totalDailyClaim.sub(claimableAmount);
+            if(msg.sender == foundationAddress) {
+                totalFoundationDailyClaim = totalFoundationDailyClaim.sub(claimableAmount);
+            } else {
+                totalDailyClaim = totalDailyClaim.sub(claimableAmount);
+            }
+
             userClaimedBalances[msg.sender].remainingDailyBalance = userClaimedBalances[msg.sender].remainingDailyBalance.sub(claimableAmount);
             userClaimedBalances[msg.sender].totalClaimedBalance = userClaimedBalances[msg.sender].totalClaimedBalance.add(claimableAmount);
 
@@ -516,66 +546,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
             return true;
         } else {
             // What conditions do we hit this on?
-            return false;
-        }
-    }
-
-
-    /**
-     * claim XBO tokens daily for the foundation
-     * onlyl available to the foundationAddress
-     *
-     * If the current claimer block number is more than a day > previous claim block number, reset the remainingDailyBalance
-     * If total claim hit zero block is more than >  previous day's block, set the block number to current block number. Then reset the totalDailyClaim to maxTotalDailyClaim
-     *
-     * get the max claimable amount based on user's current claimed balance and the total daily claimable amount for token
-     * if that claimable amount > 0
-     * apply the claimable amount to the claimer's balancae
-     * mint the token
-     *
-     */
-    function claimFoundation() public canClaimFoundation onlyFoundation returns (bool) {
-        // Reset daily user block limit on a per user basis
-        if (userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) >= block.number) {
-            userClaimedBalances[msg.sender].blockNumber = block.number;
-            userClaimedBalances[msg.sender].remainingDailyBalance = maxFoundationIndividualDailyClaim;
-        }
-
-        // Reset total daily block limit for all users if true
-        if (totalFoundationDailyClaimHitZeroBlock.add(blocksInADay) >= block.number) {
-            totalFoundationDailyClaimHitZeroBlock = block.number;
-            totalFoundationDailyClaim = maxFoundationTotalDailyClaim;
-        }
-
-
-        //Base potential claim amount calculated as claimable balance (value left over from total claimable balance) − totalClaimed so far
-        uint256 claimableAmount = userClaimedBalances[msg.sender].claimableBalance.sub(userClaimedBalances[msg.sender].totalClaimedBalance);
-
-        // First limiter checks user daily remaining balance
-        if (claimableAmount > userClaimedBalances[msg.sender].remainingDailyBalance) {
-            claimableAmount = userClaimedBalances[msg.sender].remainingDailyBalance;
-        }
-
-        // Second limiter checks total daily limit
-        if (claimableAmount > totalFoundationDailyClaim) {
-            claimableAmount = totalFoundationDailyClaim;
-        }
-
-        // We have a claimable amount
-        if (claimableAmount > 0) {
-            totalFoundationDailyClaim = totalFoundationDailyClaim.sub(claimableAmount);
-            userClaimedBalances[msg.sender].remainingDailyBalance = userClaimedBalances[msg.sender].remainingDailyBalance.sub(claimableAmount);
-            userClaimedBalances[msg.sender].totalClaimedBalance = userClaimedBalances[msg.sender].totalClaimedBalance.add(claimableAmount);
-
-            if (userClaimedBalances[msg.sender].totalClaimedBalance == userClaimedBalances[msg.sender].claimableBalance) {
-                userClaimedBalances[msg.sender].canClaim = false;
-            }
-
-            mint(msg.sender, claimableAmount);
-
-            return true;
-        } else {
-            // What conditions could lead us here?
             return false;
         }
     }
@@ -594,17 +564,43 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      *
      *
      */
-
-    function calculateReward() private returns(uint256) {
-        //stakeReward += userStake / totalStake ∗ (currentBlock − totalStakeBlock) / blocksInADay
-        stakeReward = stakeReward.add(userStakeHistory[msg.sender].userStake.div(currentTotalStake).mul(currentBlock.sub(currentTotalStakeBlock)).div(blocksInADay));
-        currentBlock = currentTotalStakeBlock;
-        while (currentBlock > userStakeHistory[msg.sender].userStakeBlock) {
-            //(totalStakeIndex, totalStakeBlock, totalStake) = getTotalStakeHistoryAtIndex(−−totalStakeIndex);
-            //stakeReward += userStake / totalStake ∗ (currentBlock − totalStakeBlock) / blocksInADay
-            stakeReward = stakeReward.add(userStakeHistory[msg.sender].userStake.div(currentTotalStake).mul(currentBlock.sub(currentTotalStakeBlock)).div(blocksInADay));
-            currentBlock = currentTotalStakeBlock;
+    function calculateReward() internal view returns(uint256) {
+        if(userStakeHistory[msg.sender].length == 0 || stakeHistory.length == 0) {
+            return 0;
         }
+        uint256 userStakeI = userStakeHistory[msg.sender].length.sub(1);
+        uint256 totalStakeI = stakeHistory.length.sub(1);
+
+        uint256 stakeRatio = 0;
+        uint256 blocksStakedFor = 0;
+        uint256 reward = 0;
+        uint256 stakeReward = 0;
+
+        if(userStakeI >= 0) {
+          uint256 calculationCurrentBlock = currentBlock;
+          uint256 calculationPreviousBlock = stakeHistory[totalStakeI].currentTotalStakeBlock;
+          uint256 calculationPreviousBlockStake = stakeHistory[totalStakeI].currentTotalStake;
+          uint256 calculationUserStakeBlock = userStakeHistory[msg.sender][userStakeI].userStakeBlock;
+
+          //calculate stake from current block to last stake entry
+          while (totalStakeI > 0 && calculationPreviousBlock >= calculationUserStakeBlock) {
+            //do the stake reward calculation
+            if(calculationPreviousBlockStake > 0 && calculationPreviousBlock > 0) {
+                stakeRatio = userStakeHistory[msg.sender][userStakeI].userStake.div(calculationPreviousBlockStake);
+                blocksStakedFor = calculationCurrentBlock.sub(calculationPreviousBlock);
+                reward = blocksStakedFor.div(blocksInADay).mul(stakeRatio).mul(dailyStakingRewards);
+                stakeReward = stakeReward.add(reward);
+            }
+
+            calculationCurrentBlock = stakeHistory[totalStakeI].currentTotalStakeBlock;
+
+            totalStakeI = totalStakeI.sub(1);
+
+            calculationPreviousBlock = stakeHistory[totalStakeI].currentTotalStakeBlock;
+            calculationPreviousBlockStake = stakeHistory[totalStakeI].currentTotalStake;
+          }
+        }
+
         return stakeReward;
     }
 
@@ -619,35 +615,40 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * increment the stakes amount
      *
      */
-    function startStaking(uint256 amount) public canStartStaking {
+    function startStaking(uint256 _amount) public canStartStaking {
 
         mint(msg.sender, calculateReward());
 
-        //balances[msg.sender] = balances[msg.sender].add(reward); //This is called in the mint function
-        currentTotalStake = currentTotalStake.add(amount);
-        currentTotalStakeBlock = block.number;
+        // perform the stake. Should we use the StakedToken.sol stake function?
+        _stake(msg.sender, _amount);
+
+        //currentTotalStake = currentTotalStake.add(_amount);
         currentTotalStakeIndex = currentTotalStakeIndex.add(1);
 
-        // get the addresses previous stake amount
+        // get the addresses previous stake entry
         CurrentUserStakesStruct storage currentStakeStruct = currentUserStakes[msg.sender];
 
         // create a new stake struct
         CurrentUserStakesStruct memory currentUserStakesStruct = CurrentUserStakesStruct({
             stakeIndex: currentStakeStruct.stakeIndex.add(1),
-            stake: currentStakeStruct.stake.add(amount),
+            stake: currentStakeStruct.stake.add(_amount),
             stakeBlock: block.number
         });
 
-        // add the values to the histroy
-        userStakeHistory[msg.sender].userStake = currentUserStakesStruct.stake;
-        userStakeHistory[msg.sender].userStakeBlock = currentUserStakesStruct.stakeBlock;
+        currentUserStakes[msg.sender] = currentUserStakesStruct;
 
-        stakeHistory[currentTotalStakeIndex].currentTotalStake = currentTotalStake;
-        stakeHistory[currentTotalStakeIndex].currentTotalStakeBlock = currentTotalStakeBlock;
+        // add the values to the userStakeHistory and stakeHistroy
+        userStakeHistory[msg.sender].push(UserStakeHistory({
+            totalStakeIndex: currentUserStakesStruct.stakeIndex,
+            userStake: currentUserStakesStruct.stake,
+            userStakeBlock: block.number
+        }));
 
-        // perform the stake. Should we use the StakedToken.sol stake function?
-        balances[msg.sender] = balances[msg.sender].sub(amount);
-        stakes[msg.sender]= stakes[msg.sender].add(amount);
+        stakeHistory.push(CurrentTotalStakesStruct({
+            currentTotalStakeIndex: currentTotalStakeIndex,
+            currentTotalStake: stakedSupply_,
+            currentTotalStakeBlock: block.number
+        }));
     }
 
     /**
@@ -661,13 +662,14 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      * subtract from the stakes amount
      *
      */
-    function stopStaking(uint256 amount) public canStopStaking {
+    function stopStaking(uint256 _amount) public canStopStaking {
         //inverse of startsStaking
         mint(msg.sender, calculateReward());
 
-        //balances[msg.sender] = balances[msg.sender].add(reward); //This is called in the mint function
-        currentTotalStake = currentTotalStake.sub(amount);
-        currentTotalStakeBlock = block.number;
+        // perform the stake. Should we use the StakedToken.sol stake function?
+        _stopStaking(msg.sender, _amount);
+
+        //currentTotalStake = currentTotalStake.sub(_amount);
         currentTotalStakeIndex = currentTotalStakeIndex.add(1);
 
         // get the addresses previous stake amount
@@ -676,20 +678,24 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         // create a new stake struct
         CurrentUserStakesStruct memory currentUserStakesStruct = CurrentUserStakesStruct({
             stakeIndex: currentStakeStruct.stakeIndex.add(1),
-            stake: currentStakeStruct.stake.sub(amount),
+            stake: currentStakeStruct.stake.sub(_amount),
             stakeBlock: block.number
         });
 
-        // add the values to the histroy
-        userStakeHistory[msg.sender].userStake = currentUserStakesStruct.stake;
-        userStakeHistory[msg.sender].userStakeBlock = currentUserStakesStruct.stakeBlock;
+        currentUserStakes[msg.sender] = currentUserStakesStruct;
 
-        stakeHistory[currentTotalStakeIndex].currentTotalStake = currentTotalStake;
-        stakeHistory[currentTotalStakeIndex].currentTotalStakeBlock = currentTotalStakeBlock;
+        // add the values to the userStakeHistory and stakeHistroy
+        userStakeHistory[msg.sender].push(UserStakeHistory({
+            totalStakeIndex: currentUserStakesStruct.stakeIndex,
+            userStake: currentUserStakesStruct.stake,
+            userStakeBlock: block.number
+        }));
 
-        // perform the stake. Should we use the StakedToken.sol stake function?
-        balances[msg.sender] = balances[msg.sender].add(amount);
-        stakes[msg.sender]= stakes[msg.sender].sub(amount);
+        stakeHistory.push(CurrentTotalStakesStruct({
+            currentTotalStakeIndex: currentTotalStakeIndex,
+            currentTotalStake: stakedSupply_,
+            currentTotalStakeBlock: block.number
+        }));
     }
 
 
@@ -702,7 +708,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      *
      */
 
-
     //Do this one at a time. Most likely.
     function addToCandidateList(address _address, string _name, string _surname, string _metadata) public onlyOwner {
         candidateList[_address] = CandidateStruct({
@@ -714,7 +719,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         candidateListAddresses.push(_address);
     }
 
-    function removeFromCandidateList(address _address) public onlyOwner {
+    /*function removeFromCandidateList(address _address) public onlyOwner {
         delete candidateList[_address];
 
         bool found = false;
@@ -729,29 +734,28 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
         if(found) {
             delete candidateListAddresses[candidateListAddresses.length-1];
-            candidateListAddresses.length--;
+            //candidateListAddresses.length = candidateListAddresses.length.sub(1);
         }
-    }
+    }*/
 
     function clearCandidateList() private {
         for(uint256 i = 0; i < candidateListAddresses.length; i++) {
             delete candidateList[candidateListAddresses[i]];
             delete candidateListAddresses[i];
         }
-        candidateListAddresses.length = 0;
+        //candidateListAddresses.length = 0;
     }
 
     function startVote() public onlyOwner isClosed {
         resetVote();
         clearCandidateList();
         voteOpen = true;
-        voteOpenBlock = block.number;
+        //voteOpenBlock = block.number;
     }
 
-    function endVote() public onlyOwner isOpen {
+    /*function endVote() public onlyOwner isOpen {
         voteOpen = false;
-        voteCloseBlock = block.number;
-        /* Tally votes and create Ambassador list */
+        //voteCloseBlock = block.number;
 
         // Step 1: Reward Ambassadors for past month, always 1 month trailing
         rewardAmbassadors();
@@ -770,7 +774,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
                 rank: i.add(1)
             });
         }
-    }
+    }*/
 
     function castVote(address _address) public canVote {
         voters[msg.sender].voted = true;
@@ -784,6 +788,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     function getStake(address _address) internal view returns(uint256) {
         return stakes[_address];
     }
+
 
     /** FEATURE 4: VOTING DISTRIBUTION
      *
@@ -819,6 +824,8 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
 
+
+
     /** FEATURE 5: AMBASSADOR
      *
      * Ambassadors are voted in from the candidate list. Stakers can vote for candidates.
@@ -835,7 +842,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      *
      */
 
-    function sortCandidates(address[] _array) internal view returns(address[]) {
+    /*function sortCandidates(address[] _array) internal view returns(address[]) {
         for(uint256 i = 0; i < _array.length; i++) {
             for(uint256 j = 0; j < i; j++) {
                 if(candidateList[_array[j-1]].votes>candidateList[_array[j]].votes){
@@ -846,34 +853,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
             }
         }
         return _array;
-    }
-
-    function quickSort(uint256[] arr, uint256 left, uint256 right) internal returns(uint256[]) {
-        uint256 i = left;
-        uint256 j = right;
-
-        uint256 pivot = arr[left.add(right.sub(left)).div(2)];
-        while (i <= j) {
-            while (arr[i] < pivot) {
-                i = i.add(1);
-            }
-            while (pivot < arr[j]) {
-                j = j.sub(1);
-            }
-            if (i <= j) {
-                (arr[i], arr[j]) = (arr[j], arr[i]);
-                i = i.add(1);
-                j = j.sub(1);
-            }
-        }
-        if (left < j)
-            quickSort(arr, left, j);
-        if (i < right)
-            quickSort(arr, i, right);
-
-        return arr;
-    }
-
+    }*/
 
     /** FEATURE 6: AMBASSADOR REWARDS
      *
@@ -887,7 +867,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
      *
      */
 
-    function rewardAmbassadors() public onlyOwner {
+    /*function rewardAmbassadors() private onlyOwner {
         for(uint256 i = 0; i < ambassadorMonthlyRewardsByPosition.length; i++) {
             uint256 reward = calculateRewardForAmbassador(i);
             mint(ambassadorList[i].ambassadorAddress, reward);
@@ -896,5 +876,5 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
 
     function calculateRewardForAmbassador(uint256 i) private view returns(uint256) {
         return ambassadorMonthlyRewardsByPosition[i].div(100);
-    }
+    }*/
 }
