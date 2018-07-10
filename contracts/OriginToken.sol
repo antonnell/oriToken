@@ -2,15 +2,12 @@ pragma solidity ^0.4.21;
 
 
 import "./templates/SafeMath.sol";
-import "./templates/ERC20Basic.sol";
-import "./templates/BasicToken.sol";
-import "./templates/Ownable.sol";
 import "./templates/Pausable.sol";
 import "./templates/BurnableToken.sol";
 import "./templates/MintableToken.sol";
 import "./templates/StakedToken.sol";
 import "./templates/CrossChainToken.sol";
-//import "./templates/NotifyContract.sol";
+import "./templates/NotifyContract.sol";
 
 /**
  * @title OriginToken
@@ -22,15 +19,12 @@ import "./templates/CrossChainToken.sol";
  * Stakeable
  * CrossChainable
  */
- /*, NotifyContract*/
-contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken, MintableToken, StakedToken, CrossChainToken {
+contract OriginToken is Pausable, BurnableToken, MintableToken, StakedToken, CrossChainToken, NotifyContract {
     using SafeMath for uint256;
 
     string public constant name = "Origin";
     string public constant symbol = "XBO";
     uint8 public constant decimals = 18;
-
-    address private foundationAddress = 0x0; //onlyOwner set. Address of the Origin Foundation
 
     uint256 private blocksInADay = 6646; // Calculated as 1 block = 13 seconds, 24 (hours) * 60 (minutes) * 60 (seconds) / 13 (13 seconds per block)
     uint256 private forkedCoinSupply = 16000000000; //Forked coin supply
@@ -156,15 +150,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     }
 
     /**
-     * @dev ownerOrFoundation validates that the incoming sender === owner
-     *
-     */
-    /*modifier ownerOrFoundation() {
-        require(msg.sender == ownerAddress || msg.sender == foundationAddress);
-        _;
-    }*/
-
-    /**
      * @dev canClaim validates that canClaim == true and (claimableBalance > 0, current Users's remainingDailyBalance > 0) or (blockNumber > previous claimed block) and (remainingDailyBalance > 0 or we are on a new day)
      *
      */
@@ -174,33 +159,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         (totalDailyClaim > 0 || totalDailyClaimHitZeroBlock.add(blocksInADay) <= block.number));
         _;
     }
-
-    /**
-     * @dev canClaimFoundation validates:
-     *
-     * canClaim == true
-     * remainingDailyBalance > 0
-     * claimableBalance > 0
-     *
-     */
-    /*modifier canClaimFoundation() {
-        require (userClaimedBalances[msg.sender].canClaim == true &&
-        ((userClaimedBalances[msg.sender].remainingDailyBalance > 0 &&
-        userClaimedBalances[msg.sender].claimableBalance > 0) ||
-        userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) >= block.number) &&
-        (totalFoundationDailyClaim > 0 ||
-        totalFoundationDailyClaimHitZeroBlock.add(blocksInADay) >= block.number));
-        _;
-    }*/
-
-    /**
-     * @dev onlyFoundation validates that the incoming address is the Origin Foundation's adddress
-     *
-     */
-    /*modifier onlyFoundation() {
-        require(msg.sender == foundationAddress);
-        _;
-    }*/
 
     /**
      * @dev canStartStaking validates that the address has balance to stake
@@ -248,9 +206,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         _;
     }
 
-    //GETTERS AND SETTERS
-
-    /*// returns ambassadorMonthlyRewardsByPosition at index position
+    // returns ambassadorMonthlyRewardsByPosition at index position
     function getAmbassadorMonthlyRewardsByPosition(uint256 _position) public view returns(uint256) {
         return ambassadorMonthlyRewardsByPosition[_position];
     }
@@ -259,7 +215,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         ambassadorMonthlyRewardsByPosition[_position] = _percent;
     }
 
-    // returns totalDailyClaimHitZeroBlock
+    /*// returns totalDailyClaimHitZeroBlock
     function getTotalDailyClaimHitZeroBlock() public view returns(uint256) {
         return totalDailyClaimHitZeroBlock;
     }
@@ -294,22 +250,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     function setTotalFoundationDailyClaim(uint256 _totalFoundationDailyClaim) public onlyOwner {
         totalFoundationDailyClaim = _totalFoundationDailyClaim;
     }*/
-
-    /**
-     * @dev returns the foundationAddress
-     * @return _foundationAddress the origin foudnation address
-     */
-    function getFoundationAddress() public view returns(address _foundationAddress) {
-        return foundationAddress;
-    }
-
-    /**
-     * @dev set the foundationAddress to _foundationAddress
-     * @param _foundationAddress the address of the origin foundation
-     */
-    function setFoundationAddress(address _foundationAddress) public onlyOwner {
-        foundationAddress = _foundationAddress;
-    }
 
     /*// returns btcPeggedPrice
     function getBTCPeggedPrice() public view returns(uint256) {
@@ -420,16 +360,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         return (a.ambassadorAddress, a.blockStarted, a.totalVotes, a.rank);
     }
 
-    /* function getStakeHistory() public returns(uint256 _currentTotalStakeIndex, uint256 _currentTotalStake, uint256 _currentTotalStakeBlock) {
-        CurrentTotalStakesStruct memory c = stakeHistory[stakeHistory.length.sub(1)];
-        return (c.currentTotalStakeIndex, c.currentTotalStake, c.currentTotalStakeBlock);
-    }
-
-    function getUserStakeHistory(address _address) public returns(uint256 _totalStakeIndex, uint256 _userStake, uint256 _userStakeBlock, uint256 _length) {
-        UserStakeHistoryStruct memory u = userStakeHistory[_address][userStakeHistory[_address].length.sub(1)];
-        return (u.totalStakeIndex, u.userStake, u.userStakeBlock, userStakeHistory[_address].length);
-    } */
-
     /**
      * @dev claim XBO tokens daily
      *
@@ -444,7 +374,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         // Reset daily user block limit on a per user basis
         if (userClaimedBalances[msg.sender].blockNumber.add(blocksInADay) >= block.number) {
             userClaimedBalances[msg.sender].blockNumber = block.number;
-            if(msg.sender == foundationAddress) {
+            if(msg.sender == owner) {
                 userClaimedBalances[msg.sender].remainingDailyBalance = maxFoundationIndividualDailyClaim;
             } else {
                 userClaimedBalances[msg.sender].remainingDailyBalance = maxIndividualDailyClaim;
@@ -452,7 +382,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
 
         // Reset total daily block limit for all users if true
-        if(msg.sender == foundationAddress) {
+        if(msg.sender == owner) {
             if (totalFoundationDailyClaimHitZeroBlock.add(blocksInADay) >= block.number) {
                 totalFoundationDailyClaimHitZeroBlock = block.number;
                 totalFoundationDailyClaim = forkedCoinSupply.div(730);
@@ -478,7 +408,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
 
         // Second limiter checks total daily limit
-        if(msg.sender == foundationAddress) {
+        if(msg.sender == owner) {
             if (claimableAmount > totalFoundationDailyClaim) {
                 claimableAmount = totalFoundationDailyClaim;
             }
@@ -490,7 +420,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
 
         // We have a claimable amount
         if (claimableAmount > 0) {
-            if(msg.sender == foundationAddress) {
+            if(msg.sender == owner) {
                 totalFoundationDailyClaim = totalFoundationDailyClaim.sub(claimableAmount);
             } else {
                 totalDailyClaim = totalDailyClaim.sub(claimableAmount);
@@ -679,25 +609,6 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         candidateListAddresses[candidateListAddressesLength] = _address;
         candidateListAddressesLength = candidateListAddressesLength.add(1);
     }
-
-    /*function removeFromCandidateList(address _address) public onlyOwner {
-        delete candidateList[_address];
-
-        bool found = false;
-        for (uint256 i = 0; i < candidateListAddresses.length-1; i++){
-            if(candidateListAddresses[i] == _address) {
-                found = true;
-            }
-
-            if(found) {
-                candidateListAddresses[i] = candidateListAddresses[i+1];
-            }
-        }
-        if(found) {
-            delete candidateListAddresses[candidateListAddresses.length-1];
-            //candidateListAddresses.length = candidateListAddresses.length.sub(1);
-        }
-    }*/
 
     /**
     * @dev remvoes all candidates from the candidateList
