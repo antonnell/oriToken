@@ -10,7 +10,7 @@ import "./templates/BurnableToken.sol";
 import "./templates/MintableToken.sol";
 import "./templates/StakedToken.sol";
 import "./templates/CrossChainToken.sol";
-import "./templates/NotifyContract.sol";
+//import "./templates/NotifyContract.sol";
 
 /**
  * @title OriginToken
@@ -22,7 +22,8 @@ import "./templates/NotifyContract.sol";
  * Stakeable
  * CrossChainable
  */
-contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken, MintableToken, StakedToken, CrossChainToken, NotifyContract {
+ /*, NotifyContract*/
+contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken, MintableToken, StakedToken, CrossChainToken {
     using SafeMath for uint256;
 
     string public constant name = "Origin";
@@ -68,14 +69,12 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     uint256 votersAddressesLength = 0;
     mapping(uint256 => CurrentTotalStakesStruct) private stakeHistory;
     uint256 stakeHistoryLength = 0;
+    mapping(uint256 => AmbassadorStuct) private ambassadorList;
+    uint256 ambassadorListLength = 0;
 
     mapping(address => ClaimStruct) private userClaimedBalances;
-
     mapping(address => CandidateStruct) private candidateList; //onlyOwner set
     mapping(address => VoterStruct) private voters;
-
-    mapping(uint256 => AmbassadorStuct) private ambassadorList;
-
     mapping(address => CurrentUserStakesStruct) private currentUserStakes;
     mapping(address => UserStakeHistoryStruct[]) private userStakeHistory;
 
@@ -735,17 +734,17 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
     */
     function endVote() public onlyOwner isOpen {
         voteOpen = false;
-        //voteCloseBlock = block.number;
 
         // Step 1: Reward Ambassadors for past month, always 1 month trailing
-        //rewardAmbassadors();
+        rewardAmbassadors();
 
         // standard quicksort, but on votes not on array index, array index for now for simplicity
         sortCandidates();
 
+        //need to reset current ambassadors first
+
         //populate 1:maxAmbassadors
         uint256 limit = (maxAmbassadors < candidateListAddressesLength) ? maxAmbassadors : candidateListAddressesLength;
-
         for(uint256 i = 0; i < limit; i++) {
             ambassadorList[i] = AmbassadorStuct({
                 ambassadorAddress: candidateListAddresses[i],
@@ -753,6 +752,7 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
                 totalVotes: candidateList[candidateListAddresses[i]].votes,
                 rank: i.add(1)
             });
+            ambassadorListLength = ambassadorListLength.add(1);
         }
     }
 
@@ -815,14 +815,11 @@ contract OriginToken is ERC20Basic, BasicToken, Ownable, Pausable, BurnableToken
         }
     }
 
-    /*function rewardAmbassadors() private onlyOwner {
-        for(uint256 i = 0; i < ambassadorMonthlyRewardsByPosition.length; i++) {
-            uint256 reward = calculateRewardForAmbassador(i);
+    function rewardAmbassadors() internal {
+        uint256 limit = (maxAmbassadors < ambassadorListLength) ? maxAmbassadors : ambassadorListLength;
+        for(uint256 i = 0; i < limit; i++) {
+            uint256 reward = dailyAmbassadorRewards.mul(365).div(12).mul(ambassadorMonthlyRewardsByPosition[i]).div(100);
             mint(ambassadorList[i].ambassadorAddress, reward);
         }
     }
-
-    function calculateRewardForAmbassador(uint256 i) private view returns(uint256) {
-        return ambassadorMonthlyRewardsByPosition[i].div(100);
-    }*/
 }
