@@ -22,11 +22,6 @@ contract MintableToken is StandardToken, Ownable {
     _;
   }
 
-  modifier hasMintPermission() {
-    require(msg.sender == owner);
-    _;
-  }
-
   /**
    * @dev Function to mint tokens
    * @param _to The address that will receive the minted tokens.
@@ -37,9 +32,8 @@ contract MintableToken is StandardToken, Ownable {
     address _to,
     uint256 _amount
   )
-    hasMintPermission
     canMint
-    public
+    internal
     returns (bool)
   {
     totalSupply_ = totalSupply_.add(_amount);
